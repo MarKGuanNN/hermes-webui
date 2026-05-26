@@ -1,37 +1,36 @@
-# Three-container Docker Compose: Hermes Agent + Dashboard + WebUI
+# 三容器 Docker Compose：Hermes Agent + Dashboard + WebUI
 #
-# QUICK START:
+# 快速开始：
 #   docker compose -f docker-compose.three-container.yml up -d
-#   Open http://localhost:8787 (chat) and http://localhost:9119 (dashboard)
+#   打开 http://localhost:8787 (聊天界面) 和 http://localhost:9119 (仪表盘)
 #
-# This extends the two-container setup with the Hermes Dashboard for
-# monitoring agent activity, sessions, and resource usage.
+# 这在双容器设置的基础上增加了 Hermes Dashboard，
+# 用于监控 Agent 的活动、会话和资源使用情况。
 #
-# Services:
-#   hermes-agent     — gateway API on port 8642 (CLI, Telegram, cron, tools)
-#   hermes-dashboard — monitoring dashboard on port 9119
-#   hermes-webui     — browser chat interface on port 8787
+# 服务：
+#   hermes-agent     — 位于端口 8642 的网关 API（CLI、Telegram、cron、工具）
+#   hermes-dashboard — 位于端口 9119 的监控仪表盘
+#   hermes-webui     — 位于端口 8787 的浏览器聊天界面
 #
-# All three share the same hermes-home volume so config, sessions,
-# skills, and memory are consistent across all surfaces.
+# 这三个服务共享同一个 hermes-home 数据卷，因此配置、会话、
+# 技能和记忆在所有交互面上都保持一致。
 #
-# WHEN NOT TO USE THIS:
-#   - You hit "Permission denied" trying to share an existing ~/.hermes directory
-#     → use docker-compose.yml (single-container) instead, OR
-#     → keep this file but switch to NAMED VOLUMES (the default) instead of bind mounts
-#   - You're on Podman 3.4 or older without keep-id namespace support
-#     → see https://github.com/sunnysktsang/hermes-suite for an all-in-one image
+# 何时不应使用此配置：
+#   - 当您尝试共享现有的 ~/.hermes 目录时遇到“Permission denied (权限拒绝)”错误
+#     → 请改用 docker-compose.yml (单容器)，或者
+#     → 保留此文件，但改用 命名数据卷 (默认配置) 而不是绑定挂载 (bind mounts)
+#   - 您使用的是 Podman 3.4 或更早版本，不支持 keep-id 命名空间
+#     → 请参考 https://github.com/sunnysktsang/hermes-suite 获取多合一镜像
 #
-# KNOWN LIMITATION (#681): tools triggered from the WebUI run in the WebUI
-# container, not the agent container. See docker-compose.two-container.yml
-# for context.
+# 已知限制 (#681)：从 WebUI 触发的工具运行在 WebUI
+# 容器中，而不是 agent 容器中。详情请参阅 docker-compose.two-container.yml。
 #
-# NOTE ON VOLUMES:
-#   This file uses named Docker volumes (hermes-home, hermes-agent-src) which
-#   work out of the box. If you prefer bind mounts (e.g. to an existing
-#   directory), see docker-compose.two-container.yml for a bind-mount example.
-#   When using bind mounts, ALL THREE containers must mount the same host path
-#   AND run as the same UID/GID (set via the UID/GID env vars below).
+# 关于数据卷 (VOLUMES) 的注意事项：
+#   此文件使用 Docker 命名数据卷 (hermes-home, hermes-agent-src)，它们
+#   开箱即用。如果您更喜欢使用绑定挂载 (例如挂载到现有
+#   目录)，请查看 docker-compose.two-container.yml 中的绑定挂载示例。
+#   使用绑定挂载时，所有三个容器必须挂载相同的主机路径
+#   并且以相同的 UID/GID 运行 (通过下面的 UID/GID 环境变量设置)。
 
 services:
   hermes-agent:
@@ -41,24 +40,24 @@ services:
     ports:
       - "127.0.0.1:8642:8642"
     volumes:
-      # Persist config, state, sessions, skills, memory across restarts
+      # 在重启期间持久化配置、状态、会话、技能和记忆
       - hermes-home:/home/hermes/.hermes
-      # Expose agent source so the WebUI can install dependencies from it
+      # 暴露 agent 源码，以便 WebUI 可以从中安装依赖项
       - hermes-agent-src:/opt/hermes
     environment:
       - HERMES_HOME=/home/hermes/.hermes
-      # Align UID/GID across containers sharing the hermes-home volume.
-      # Defaults to 1000 to match WANTED_UID/WANTED_GID in the webui service.
+      # 在共享 hermes-home 数据卷的容器间对齐 UID/GID。
+      # 默认为 1000，以匹配 webui 服务中的 WANTED_UID/WANTED_GID。
       - HERMES_UID=${UID:-1000}
       - HERMES_GID=${GID:-1000}
-      # Bind-mount permission handling for the agent — narrow set of overrides.
-      # NOTE: The agent's HERMES_HOME_MODE applies to the HERMES_HOME *directory*
-      # mode (default 0700) — NOT to credential files like the WebUI's variant.
-      # If you set this, you MUST keep the owner-execute bit so the agent can
-      # traverse its own home directory. 0640 BREAKS the agent (no x bit → no
-      # traversal). Use 0750 for group-traversable or 0701 for x-only.
-      # The agent's container detection (/.dockerenv) already auto-skips
-      # credential chmod inside Docker, so HERMES_SKIP_CHMOD is redundant here.
+      # 针对 agent 的绑定挂载权限处理 —— 少数几个覆盖选项。
+      # 注意：agent 的 HERMES_HOME_MODE 适用于 HERMES_HOME *目录* 的
+      # 权限模式 (默认 0700) —— 而不适用于像 WebUI 变体那样的凭据文件。
+      # 如果您设置了此项，您必须保留所有者的执行权限位 (owner-execute bit)，以便 agent 可以
+      # 遍历其自己的主目录。设置为 0640 会破坏 agent 运行 (没有 x 位 → 无法
+      # 遍历)。使用 0750 允许用户组遍历，或使用 0701 仅允许执行。
+      # agent 的容器检测 (/.dockerenv) 已经在 Docker 内自动跳过了
+      # 凭据的 chmod，因此在这里设置 HERMES_SKIP_CHMOD 是多余的。
       # - HERMES_HOME_MODE=0750
     restart: unless-stopped
     deploy:
@@ -79,11 +78,11 @@ services:
       - hermes-home:/home/hermes/.hermes
     environment:
       - HERMES_HOME=/home/hermes/.hermes
-      # Align UID/GID across containers sharing the hermes-home volume.
-      # Defaults to 1000 to match WANTED_UID/WANTED_GID in the webui service.
+      # 在共享 hermes-home 数据卷的容器间对齐 UID/GID。
+      # 默认为 1000，以匹配 webui 服务中的 WANTED_UID/WANTED_GID。
       - HERMES_UID=${UID:-1000}
       - HERMES_GID=${GID:-1000}
-      # Dashboard connects to the gateway for health/session data
+      # Dashboard 连接到网关以获取健康状况/会话数据
       - GATEWAY_HEALTH_URL=http://hermes-agent:8642
     depends_on:
       - hermes-agent
@@ -102,45 +101,45 @@ services:
     depends_on:
       - hermes-agent
     ports:
-      # Expose on localhost only. Remove 127.0.0.1: to expose on all interfaces
-      # (set HERMES_WEBUI_PASSWORD if doing so).
+      # 仅在 localhost 暴露。移除 127.0.0.1: 可在所有网络接口上暴露
+      # (如果这样做，请设置 HERMES_WEBUI_PASSWORD)。
       - "127.0.0.1:8787:8787"
     volumes:
-      # Same hermes home as the agent — shares config, sessions, state
+      # 与 agent 使用相同的 hermes home —— 共享配置、会话和状态
       - hermes-home:/home/hermeswebui/.hermes
-      # Agent source mounted where docker_init.bash expects it.
-      # Mounted read-only — the WebUI only reads this volume to install
-      # the agent's Python dependencies at startup (`uv pip install`).
-      # Read-only enforces that defence-in-depth at the kernel layer.
+      # 挂载 agent 源码到 docker_init.bash 期望的位置。
+      # 以只读方式挂载 —— WebUI 仅在启动时读取此数据卷来安装
+      # agent 的 Python 依赖 (`uv pip install`)。
+      # 只读挂载在内核层强制执行了纵深防御。
       - hermes-agent-src:/home/hermeswebui/.hermes/hermes-agent:ro
-      # Workspace directory — browse and edit files from the WebUI.
-      # Adapt the host path to your project directory.
-      # ${HOME} is used rather than `~` so the default resolves the same way
-      # across Linux, macOS, WSL2, and Docker Desktop on Windows.
+      # 工作区目录 —— 可以从 WebUI 浏览和编辑文件。
+      # 请根据您的项目目录调整主机路径。
+      # 这里使用 ${HOME} 而不是 `~`，以便在 Linux、macOS、WSL2 和 Windows 的
+      # Docker Desktop 上以相同的方式解析默认值。
       - ${HERMES_WORKSPACE:-${HOME}/workspace}:/workspace
     environment:
       - HERMES_WEBUI_HOST=0.0.0.0
       - HERMES_WEBUI_PORT=8787
       - HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
-      # Match your host user's UID/GID for correct file permissions.
-      # Run `id -u` and `id -g` to find your values.
-      # On macOS, UIDs start at 501 (not 1000) — set these in a .env file:
+      # 匹配宿主机用户的 UID/GID 以确保正确的文件权限。
+      # 运行 `id -u` 和 `id -g` 来查找您的对应值。
+      # 在 macOS 上，UID 从 501 开始 (而不是 1000) —— 请在 .env 文件中进行设置：
       #   echo "UID=$(id -u)" >> .env && echo "GID=$(id -g)" >> .env
       - WANTED_UID=${UID:-1000}
       - WANTED_GID=${GID:-1000}
-      # NOTE: When using bind-mount volumes shared across containers, ALL containers
-      # that write to the same host directory must run as the same UID/GID.
-      # If hermes-agent initialises the state dir as root (UID 0), hermes-webui
-      # will get a PermissionError accessing those paths — including a crash on every
-      # HTTP request if the auth signing-key file is unreadable. Either set WANTED_UID
-      # to match the agent container's UID, or use a named Docker volume (preferred).
-      # Optional: set a password for remote access
+      # 注意：当使用在容器间共享的绑定挂载数据卷时，所有向该同一主机目录
+      # 写入的容器必须以相同的 UID/GID 运行。
+      # 如果 hermes-agent 以 root (UID 0) 身份初始化状态目录，hermes-webui
+      # 在访问这些路径时将遇到 PermissionError (权限错误) —— 如果身份验证签名密钥文件
+      # 不可读，甚至会导致每次 HTTP 请求时崩溃。请将 WANTED_UID 设置为
+      # 匹配 agent 容器的 UID，或者使用 Docker 命名数据卷 (推荐)。
+      # 可选：设置密码以用于远程访问
       # - HERMES_WEBUI_PASSWORD=your-secret-password
-      # Bind-mount permission handling for the WebUI (fixes #1389, #1399).
-      # NOTE: WebUI's HERMES_HOME_MODE is a credential-file threshold (allow
-      # group bits on .env/.signing_key/etc.), DIFFERENT from the agent's
-      # which applies to the HERMES_HOME directory itself. 0640 is correct
-      # for the WebUI; do NOT copy this value to the agent service block.
+      # WebUI 的绑定挂载权限处理 (修复 #1389, #1399)。
+      # 注意：WebUI 的 HERMES_HOME_MODE 是凭据文件的阈值 (允许
+      # 在 .env/.signing_key/ 等文件上设置组权限位)，这与 agent 的设置不同，
+      # agent 的设置适用于 HERMES_HOME 目录本身。对于 WebUI 来说，0640
+      # 是正确的；请勿将此值复制到 agent 服务块中。
       # - HERMES_SKIP_CHMOD=1
       # - HERMES_HOME_MODE=0640
     restart: unless-stopped
@@ -152,17 +151,17 @@ networks:
     driver: bridge
 
 volumes:
-  # IMPORTANT — upgrading the agent image:
-  #   The `hermes-agent-src` volume is initialised from the agent image's
-  #   `/opt/hermes` on first `up`, and Docker reuses the volume verbatim on
-  #   later runs — even after `docker pull` of a newer agent image. After
-  #   upgrading the agent image, run:
+  # 重要提示 —— 升级 agent 镜像：
+  #   `hermes-agent-src` 数据卷在第一次执行 `up` 时从 agent 镜像的
+  #   `/opt/hermes` 初始化，在随后的运行中，Docker 会原封不动地重用该数据卷 ——
+  #   即使在 `docker pull` 获取了较新的 agent 镜像之后也是如此。在
+  #   升级 agent 镜像后，请运行：
   #
   #     docker compose -f docker-compose.three-container.yml down
   #     docker volume rm <project>_hermes-agent-src
   #     docker compose -f docker-compose.three-container.yml pull
   #     docker compose -f docker-compose.three-container.yml up -d
   #
-  #   The full procedure (and why) is documented in docs/docker.md.
+  #   完整过程（及其原因）记录在 docs/docker.md 中。
   hermes-home:
   hermes-agent-src:
